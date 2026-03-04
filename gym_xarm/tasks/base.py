@@ -318,7 +318,8 @@ class Base(gym.Env):
     def _render(self, renderer: MujocoRenderer):
         self._render_callback()
         # render = renderer.render(self.render_mode, camera_name="camera0")
-        render = renderer.render(self.render_mode)
+        camera_id = self.model.camera("camera0").id
+        render = renderer.render(self.render_mode, camera_id=camera_id)
         return render.copy() if render is not None else None
 
     def _render_callback(self):

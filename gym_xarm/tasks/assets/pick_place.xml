@@ -24,9 +24,11 @@
 
 		<body pos="1.5 0.075 0.3425" name="table0">
 			<geom name="tablegeom0" size="0.3 0.6 0.2" pos="0 0 0" type="box" material="table_mat" density="2000" friction="1 1 1"></geom>
+
+			<!-- Goal marker (visual). You can move this in code if desired. -->
+			<site name="goal_site" pos="0.05 0.00 0.201" size="0.02 0.02 0.002" type="box" rgba="0 1 0 0.35"></site>
 		</body>
 
-		<!-- Keep object body for compatibility; Reach task ignores it -->
 		<body name="object" pos="1.405 0.3 0.58625">
 			<joint name="object_joint0" type="free" limited="false"></joint>
 			<!-- 40mm cube => half-size 0.02 -->

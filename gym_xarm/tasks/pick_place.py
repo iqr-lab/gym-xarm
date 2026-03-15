@@ -1,5 +1,5 @@
 import numpy as np
-
+import mujoco
 from gym_xarm.tasks import Base
 
 
@@ -17,7 +17,7 @@ class _PickPlaceBase(Base):
 
         # thresholds (tune as needed)
         self._lift_z_thresh = 0.10        # lift above table by this much
-        self._place_tol = 0.04            # xy+z tolerance for success
+        self._place_tol = 0.015            # xy+z tolerance for success
         self._goal = np.zeros(3, dtype=np.float32)
         self._init_z = 0.0
 
@@ -25,11 +25,46 @@ class _PickPlaceBase(Base):
 
     @property
     def goal(self):
-        return self._goal
+        return self._goal - self.center_of_table
 
     @property
     def lift_z_target(self):
         return self._init_z + self._lift_z_thresh
+    
+
+    def _set_goal_marker(self, goal_local):
+
+        site_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_SITE,
+            "goal_site"
+        )
+
+        if site_id < 0:
+            return
+
+        table_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            "table0"
+        )
+        table_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            "table0"
+        )
+
+        table_pos = self.model.body_pos[table_body_id]
+
+        goal_body = goal_local - table_pos
+        goal_body[2] = goal_body[2] -0.0215
+
+        # print(f"table pos {table_pos}")
+        # print(f"goal body {goal_body}")
+
+        self.model.site_pos[site_id] = goal_body
+
+        mujoco.mj_forward(self.model, self.data)
 
     def is_success(self):
         # success: object close to goal
@@ -141,8 +176,8 @@ class _PickPlaceBase(Base):
         # Randomize object start
         # -------------------------
         object_pos = self.center_of_table - np.array([0.15, 0.10, 0.07])
-        object_pos[0] += self.np_random.uniform(-0.06, 0.06)
-        object_pos[1] += self.np_random.uniform(-0.06, 0.06)
+        object_pos[0] += self.np_random.uniform(-0.1, 0.1)
+        object_pos[1] += self.np_random.uniform(-0.1, 0.1)
 
         object_qpos = self._utils.get_joint_qpos(self.model, self.data, "object_joint0")
         object_qpos[:3] = object_pos
@@ -153,14 +188,12 @@ class _PickPlaceBase(Base):
         # -------------------------
         # Randomize goal on table (same z as object start)
         # -------------------------
-        goal = self.center_of_table.copy()
-        goal += np.array([0.05, 0.00, -0.07])  # move into reachable tabletop region
+        goal = self.center_of_table - np.array([0.15, -0.10, 0.07], dtype=np.float32)
         goal[0] += self.np_random.uniform(-0.10, 0.10)
-        goal[1] += self.np_random.uniform(-0.10, 0.10)
-        goal[2] = object_pos[2]  # goal on table plane
+        goal[1] += self.np_random.uniform(-0.30, 0.10)
 
         self._goal = goal.astype(np.float32)
-
+        self._set_goal_marker(self._goal)
         return self._goal
 
     def reset(self, seed=None, options: dict | None = None):

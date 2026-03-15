@@ -1,3 +1,4 @@
+import mujoco
 import numpy as np
 
 from gym_xarm.tasks import Base
@@ -12,7 +13,6 @@ class Reach(Base):
     }
 
     def __init__(self, **kwargs):
-        # success threshold in meters
         self._success_thresh = 0.03
         self._goal = np.zeros(3, dtype=np.float32)
         super().__init__("reach", **kwargs)
@@ -25,15 +25,8 @@ class Reach(Base):
         return np.linalg.norm(self.eef - self.goal) <= self._success_thresh
 
     def get_reward(self):
-        # dense shaping reward: negative distance
         dist = np.linalg.norm(self.eef - self.goal)
-
-        # small bonus when close + encourage opening gripper slightly (optional)
-        close_bonus = 1.0 if dist <= self._success_thresh else 0.0
-        gripper_bonus = max(self._action[-1], 0.0) / 50.0  # same scale idea as Lift
-
-        # scale similar to Lift: distance is ~0.0-0.5, divide to keep magnitudes tame
-        return (-dist) / 10.0 + close_bonus + gripper_bonus
+        return -dist
 
     def _get_obs(self):
         eef_to_goal = self.eef - self.goal
@@ -52,34 +45,44 @@ class Reach(Base):
             axis=0,
         )
 
+    def _set_goal_marker(self, goal_local):
+        try:
+            body_id = mujoco.mj_name2id(
+                self.model,
+                mujoco.mjtObj.mjOBJ_BODY,
+                "goal_marker",
+            )
+            if body_id == -1:
+                print("Warning: goal_marker body not found")
+                return
+
+            goal_world = self.center_of_table + np.asarray(goal_local, dtype=np.float64)
+            self.model.body_pos[body_id] = goal_world
+            mujoco.mj_forward(self.model, self.data)
+        except Exception as e:
+            print(f"Warning: could not move goal marker: {e}")
+
     def _sample_goal(self):
-        # -------------------------
-        # Randomize gripper start
-        # -------------------------
         gripper_pos = np.array([1.280, 0.295, 0.735]) + self.np_random.uniform(
             -0.05, 0.05, size=3
         )
         super()._set_gripper(gripper_pos, self.gripper_rotation)
 
-        # -------------------------
-        # Sample reachable goal
-        # -------------------------
-        # Goal near the table center, slightly above table surface
-        # You may need to tweak these offsets based on your xArm setup.
-        goal = self.center_of_table.copy()
-        goal += np.array([0.05, 0.00, 0.10])  # bias forward + above table
-        goal[0] += self.np_random.uniform(-0.10, 0.10)
-        goal[1] += self.np_random.uniform(-0.10, 0.10)
-        goal[2] += self.np_random.uniform(-0.03, 0.08)
+        # table-relative goal, matching self.eef frame
+        goal = np.array([0.00, 0.00, 0.010], dtype=np.float32)
+        goal[0] += self.np_random.uniform(-0.05, 0.05)
+        goal[1] += self.np_random.uniform(-0.05, 0.05)
+        goal[2] += self.np_random.uniform(-0.01, 0.10)
 
         self._goal = goal.astype(np.float32)
-
-        # Base expects a "goal" return (even if you don't use it elsewhere)
+        self._set_goal_marker(self._goal)
         return self._goal
 
     def reset(self, seed=None, options: dict | None = None):
         self._action = np.zeros(4, dtype=np.float32)
-        return super().reset(seed=seed, options=options)
+        obs, info = super().reset(seed=seed, options=options)
+        self._set_goal_marker(self._goal)
+        return obs, info
 
     def step(self, action):
         self._action = action.copy()

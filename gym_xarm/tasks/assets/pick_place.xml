@@ -26,14 +26,13 @@
 			<geom name="tablegeom0" size="0.3 0.6 0.2" pos="0 0 0" type="box" material="table_mat" density="2000" friction="1 1 1"></geom>
 
 			<!-- Goal marker (visual). You can move this in code if desired. -->
-			<site name="goal_site" pos="0.05 0.00 0.201" size="0.02 0.02 0.002" type="box" rgba="0 1 0 0.35"></site>
+			<site name="goal_site" pos="0.05 0.00 0.0" size="0.025 0.025 0.001" type="box" rgba="0 1 0 1"></site>
+			<!-- site name="goal_site" pos="0.05 0.00 0.21"  size="0.02"		   type="sphere" rgba="1 0 0 1"/></site-->
 		</body>
 
 		<body name="object" pos="1.405 0.3 0.58625">
 			<joint name="object_joint0" type="free" limited="false"></joint>
-			<!-- 40mm cube => half-size 0.02 -->
-			<geom size="0.02 0.02 0.02" type="box" name="object0" material="block_mat" density="50000"
-			      condim="4" friction="1 1 1" solimp="1 1 1" solref="0.02 1"></geom>
+			<geom size="0.02 0.02 0.02" type="box" name="object0" material="block_mat" density="50000" condim="4" friction="1 2 2" solimp="1 1 1" solref="0.02 1"></geom>
 			<site name="object_site" pos="0 0 0" size="0.02 0.02 0.02" rgba="1 0 0 0" type="box"></site>
 		</body>
 

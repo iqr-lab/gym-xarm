@@ -147,7 +147,7 @@ class Base(gym.Env):
                 f"Unknown render type {renderer_type}. Must be one of [observation, visualization]"
             )
 
-        return MujocoRenderer(model, self.data, camera_id=0)
+        return MujocoRenderer(model, self.data)
 
     @property
     def dt(self):
@@ -318,8 +318,11 @@ class Base(gym.Env):
     def _render(self, renderer: MujocoRenderer):
         self._render_callback()
         # render = renderer.render(self.render_mode, camera_name="camera0")
+        # renderer.viewer.cam.fixedcamid = 1
+        # renderer.viewer.cam.type = 2  # 2 corresponds to mjCAMERA_FIXED
         render = renderer.render(self.render_mode)
         return render.copy() if render is not None else None
+        
 
     def _render_callback(self):
         self._mujoco.mj_forward(self.model, self.data)

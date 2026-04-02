@@ -102,33 +102,57 @@ class _PickPlaceBase(Base):
             return r
 
         # -------------------------
-        # Dense shaping reward
+        # Pick & Place Dense Reward
         # -------------------------
-        # Idea:
-        # - stage 1: reach (minimize eef->obj)
-        # - stage 2: lift (maximize z up to target)
-        # - stage 3: place (minimize obj->goal)
-        # Keep magnitudes stable like Lift: distances divided down.
-        r = 0.0
 
-        # Reach shaping
-        r += (-reach_dist) / 10.0
+        # distances
+        reach_dist = np.linalg.norm(self.eef - self.obj)
+        place_dist = np.linalg.norm(self.obj - self.goal)
 
-        # Lift shaping
-        if not obj_dropped:
-            lift_progress = np.clip((self.obj[2] - self._init_z) / max(self._lift_z_thresh, 1e-6), 0.0, 1.0)
-            r += 0.5 * lift_progress
+        # height info
+        obj_height = self.obj[2]
+        table_height = self._init_z
 
-        # Place shaping (only meaningful once lifted a bit)
-        if self.obj[2] > (self._init_z + 0.02) and not obj_dropped:
-            r += (-place_dist) / 10.0
+        # lifted flag (state-based, NOT action-based)
+        lifted = obj_height > table_height + 0.04
 
-        # Completion bonus
-        if self.is_success() and not obj_dropped:
-            r += 3.0
+        # -------------------------
+        # 1. Reach reward (always active)
+        # -------------------------
+        r_reach = -reach_dist
 
-        # tiny gripper term (optional)
-        r += max(self._action[-1], 0.0) / 100.0
+        # -------------------------
+        # 2. Lift reward (only when close)
+        # -------------------------
+        # encourage lifting ONLY when near object
+        if reach_dist < 0.05:
+            lift_height = np.clip(obj_height - table_height, 0.0, 0.2)
+            r_lift = lift_height
+        else:
+            r_lift = 0.0
+
+        # -------------------------
+        # 3. Place reward (only when lifted)
+        # -------------------------
+        if lifted:
+            r_place = -place_dist
+        else:
+            r_place = 0.0
+
+        # -------------------------
+        # 4. Combine (balanced weights)
+        # -------------------------
+        r = (
+            1.0 * r_reach
+            + 2.0 * r_lift
+            + 5.0 * r_place
+        )
+
+        # -------------------------
+        # 5. Success bonus (dominant)
+        # -------------------------
+        if self.is_success():
+            r += 10.0
 
         return r
 
@@ -198,6 +222,7 @@ class _PickPlaceBase(Base):
 
     def reset(self, seed=None, options: dict | None = None):
         self._action = np.zeros(4, dtype=np.float32)
+        self._prev_eef = self.eef.copy()
         return super().reset(seed=seed, options=options)
 
     def step(self, action):
